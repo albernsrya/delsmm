@@ -3,8 +3,10 @@
 #
 
 import torch
-from delsmm.lagsys import BasicLagrangianSystem
+
 from delsmm.lagcrit import DELCriterion
+from delsmm.lagsys import BasicLagrangianSystem
+
 
 def test():
 
@@ -17,7 +19,7 @@ def test():
 
     B = 4
 
-    t = torch.arange(T).unsqueeze(0).repeat(B,1)
+    t = torch.arange(T).unsqueeze(0).repeat(B, 1)
 
     q = torch.randn(B, T, qdim)
     q.requires_grad = True
@@ -38,5 +40,5 @@ def test():
     print(J)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()

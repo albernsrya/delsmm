@@ -2,13 +2,15 @@
 # utils.py
 #
 
-from torch.autograd.functional import jacobian
-import torch
-import numpy as np
-from numpy import pi
-import timeit
 import random
 import sys
+import timeit
+
+import numpy as np
+import torch
+from numpy import pi
+from torch.autograd.functional import jacobian
+
 try:
     import resource
 except ImportError:
@@ -16,14 +18,10 @@ except ImportError:
 
 from contextlib import contextmanager
 
-
-from scipy.interpolate import UnivariateSpline
-
 from pykalman import KalmanFilter
+from scipy.interpolate import UnivariateSpline
 from scipy.linalg import expm
-
 from tqdm import tqdm
-
 
 
 def _check_param_device(param, old_param_device):
@@ -45,13 +43,14 @@ def _check_param_device(param, old_param_device):
     else:
         warn = False
         if param.is_cuda:  # Check if in same GPU
-            warn = (param.get_device() != old_param_device)
+            warn = param.get_device() != old_param_device
         else:  # Check if in CPU
-            warn = (old_param_device != -1)
+            warn = old_param_device != -1
         if warn:
-            raise TypeError('Found two parameters on different devices, '
-                            'this is currently not supported.')
+            raise TypeError("Found two parameters on different devices, "
+                            "this is currently not supported.")
     return old_param_device
+
 
 def qqdot_to_q(qqdot, dt):
     """
@@ -60,39 +59,43 @@ def qqdot_to_q(qqdot, dt):
         qqdot (torch.tensor): (B,T,qdim*2) [q,qdot]
         dt (float): timestemp
     Returns:
-        q (torch.tensor): (B,T+1,qdim) 
+        q (torch.tensor): (B,T+1,qdim)
     Notes:
         Finds q_{1:T+1} s.t qqdot_t approx [0.5*(q_t+1 + q_t),
                                             (1./dt)*(q_t+1 - q_t)]
     """
 
-    B,T,qdim2 = qqdot.shape
-    qdim = qdim2//2
+    B, T, qdim2 = qqdot.shape
+    qdim = qdim2 // 2
 
     # find a matrix D that maps q to qddot
-    a = torch.randn(T+1,qdim).reshape(-1)
+    a = torch.randn(T + 1, qdim).reshape(-1)
     a.requires_grad = True
+
     def lam(a):
-        a_ = a.reshape(T+1,qdim)
-        b1 = 0.5*(a_[1:] + a_[:-1])
-        b2  = (1./dt) * (a_[1:] - a_[:-1])
-        b = torch.cat([b1,b2],dim=-1)
+        a_ = a.reshape(T + 1, qdim)
+        b1 = 0.5 * (a_[1:] + a_[:-1])
+        b2 = (1.0 / dt) * (a_[1:] - a_[:-1])
+        b = torch.cat([b1, b2], dim=-1)
         return b.reshape(-1)
+
     D = jacobian(lam, a)
 
     # solve least squares problem
-    q = torch.zeros(B,(T+1)*qdim)
-    qqdot = qqdot.reshape(B,-1,1)
+    q = torch.zeros(B, (T + 1) * qdim)
+    qqdot = qqdot.reshape(B, -1, 1)
     for b in range(B):
         sol = torch.lstsq(qqdot[b], D)[0]
-        q[b,:] = sol[:(T+1)*qdim].reshape(-1)
+        q[b, :] = sol[:(T + 1) * qdim].reshape(-1)
 
-    return q.reshape(B,T+1,qdim)
+    return q.reshape(B, T + 1, qdim)
+
 
 def bfill_uppertriangle(A, vec):
-	ii, jj = np.triu_indices(A.size(-2), k=1, m=A.size(-1))
-	A[..., ii, jj] = vec
-	return A
+    ii, jj = np.triu_indices(A.size(-2), k=1, m=A.size(-1))
+    A[..., ii, jj] = vec
+    return A
+
 
 def bfill_lowertriangle(A, vec):
     ii, jj = np.tril_indices(A.size(-2), k=-1, m=A.size(-1))
@@ -104,6 +107,7 @@ def bfill_diagonal(A, vec):
     ii, jj = np.diag_indices(min(A.size(-2), A.size(-1)))
     A[..., ii, jj] = vec
     return A
+
 
 def parameter_grads_to_vector(parameters):
     """Convert parameters to one vector
@@ -138,7 +142,8 @@ def vector_to_parameter_grads(vec, parameters):
     """
     # Ensure vec of type Tensor
     if not isinstance(vec, torch.Tensor):
-        raise TypeError('expected torch.Tensor, but got: {}'.format(torch.typename(vec)))
+        raise TypeError("expected torch.Tensor, but got: {}".format(
+            torch.typename(vec)))
     # Flag for the device where the parameter is located
     param_device = None
 
@@ -172,18 +177,18 @@ def smooth_and_diff(x, dt, nders=2, **kwargs):
         smooth_series (list of torch.tensor): list of (B,T,n) smooth tensors (xsm, dxsmdt, ...)
     """
 
-    retvals = [torch.zeros_like(x) for i in range(nders+1)]
+    retvals = [torch.zeros_like(x) for i in range(nders + 1)]
 
     B, T, N = x.shape
     t = np.arange(T) * dt
     for b in range(B):
         for n in range(N):
-            ser = x[b,:,n].detach().numpy()
+            ser = x[b, :, n].detach().numpy()
             spl = UnivariateSpline(t, ser, **kwargs)
 
-            retvals[0][b,:,n] = torch.tensor(spl(t))
+            retvals[0][b, :, n] = torch.tensor(spl(t))
             for d in range(nders):
-                retvals[d+1][b,:,n] = torch.tensor(spl.derivative(d)(t))
+                retvals[d + 1][b, :, n] = torch.tensor(spl.derivative(d)(t))
 
     return retvals
 
@@ -200,35 +205,38 @@ def kalman_smooth_and_diff(x, dt, nders=2, em_Q=False):
         smooth_series (list of torch.tensor): list of (B,T,n) smooth tensors (xsm, dxsmdt, ...)
     """
 
-    retvals = [torch.zeros_like(x) for i in range(nders+1)]
+    retvals = [torch.zeros_like(x) for i in range(nders + 1)]
 
-    em_vars = ['initial_state_mean', 'initial_state_covariance', 
-                        'observation_covariance']
+    em_vars = [
+        "initial_state_mean",
+        "initial_state_covariance",
+        "observation_covariance",
+    ]
     if em_Q:
-        em_vars += ['transition_covariance']
+        em_vars += ["transition_covariance"]
 
     if nders != 2:
         raise NotImplementedError
 
-    A = np.array([[0.,1.,0.],
-                  [0.,0.,1.],
-                  [0.,0.,0.]])
+    A = np.array([[0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [0.0, 0.0, 0.0]])
     Ad = expm(A * dt)
-    Bd = np.array([[1.,0.,0.]])
+    Bd = np.array([[1.0, 0.0, 0.0]])
 
-    Q = np.diag([0.001,0.001,1.0])
+    Q = np.diag([0.001, 0.001, 1.0])
 
     B, T, N = x.shape
     for b in tqdm(range(B)):
         for n in range(N):
-            ser = x[b,:,n:n+1].detach().numpy()
+            ser = x[b, :, n:n + 1].detach().numpy()
 
-            kf = KalmanFilter(transition_matrices=Ad, observation_matrices=Bd, transition_covariance=Q)
+            kf = KalmanFilter(transition_matrices=Ad,
+                              observation_matrices=Bd,
+                              transition_covariance=Q)
             kf.em(ser, em_vars=em_vars)
             sm_x, _ = kf.smooth(ser)
             sm_x = torch.tensor(sm_x)
 
             for i in range(3):
-                retvals[i][b,:,n] = sm_x[:,i]
+                retvals[i][b, :, n] = sm_x[:, i]
 
     return retvals

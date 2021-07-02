@@ -2,17 +2,17 @@
 # generate_lorenz_data.py
 #
 
+import matplotlib.pyplot as plt
+import numpy as np
 import torch
 from ceem import utils
 from torch.utils.data import TensorDataset
-import numpy as np
+from tqdm import tqdm
 
 from delsmm.systems.lag_doublepen import LagrangianDoublePendulum
 
-from tqdm import tqdm
-import matplotlib.pyplot as plt
-
 plot = False
+
 
 def main():
 
@@ -21,9 +21,9 @@ def main():
     torch.set_default_dtype(torch.float64)
 
     dt = 0.05
-    sys = LagrangianDoublePendulum(dt, 1.,1.,1.,1.,10., eta=0.5)
+    sys = LagrangianDoublePendulum(dt, 1.0, 1.0, 1.0, 1.0, 10.0, eta=0.5)
 
-    q1 = torch.rand(16,1,2) * np.pi - np.pi/2
+    q1 = torch.rand(16, 1, 2) * np.pi - np.pi / 2
     q2 = q1.clone()
 
     qs = [q1, q2]
@@ -32,13 +32,13 @@ def main():
         qt = qs[-2].detach()
         qtp1 = qs[-1].detach()
 
-        nq = sys.variational_step(qt,qtp1, oneatatime=True)
+        nq = sys.variational_step(qt, qtp1, oneatatime=True)
         qs.append(nq)
 
     x = torch.cat(qs, dim=1).detach()
 
     B, T, _ = x.shape
-    t = torch.arange(T).unsqueeze(0).repeat(B,1).float() 
+    t = torch.arange(T).unsqueeze(0).repeat(B, 1).float()
 
     y_p01 = (x + 0.01 * torch.randn_like(x)).detach()
     y_p05 = (x + 0.05 * torch.randn_like(x)).detach()
@@ -50,53 +50,47 @@ def main():
     y_1p0 = (x + 1.0 * torch.randn_like(x)).detach()
 
     dataset = TensorDataset(t, x, y_p01)
-    torch.save(dataset, './datasets/damped_dubpen_0p01.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p01.td")
 
     dataset = TensorDataset(t, x, y_p05)
-    torch.save(dataset, './datasets/damped_dubpen_0p05.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p05.td")
 
     dataset = TensorDataset(t, x, y_p10)
-    torch.save(dataset, './datasets/damped_dubpen_0p10.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p10.td")
 
     dataset = TensorDataset(t, x, y_p20)
-    torch.save(dataset, './datasets/damped_dubpen_0p20.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p20.td")
 
     dataset = TensorDataset(t, x, y_p30)
-    torch.save(dataset, './datasets/damped_dubpen_0p30.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p30.td")
 
     dataset = TensorDataset(t, x, y_p40)
-    torch.save(dataset, './datasets/damped_dubpen_0p40.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p40.td")
 
     dataset = TensorDataset(t, x, y_p50)
-    torch.save(dataset, './datasets/damped_dubpen_0p50.td')
+    torch.save(dataset, "./datasets/damped_dubpen_0p50.td")
 
     dataset = TensorDataset(t, x, y_1p0)
-    torch.save(dataset, './datasets/damped_dubpen_1p0.td')
+    torch.save(dataset, "./datasets/damped_dubpen_1p0.td")
 
-
-    x_ = (x[:,1:] + x[:,:-1]) * 0.5
-    dx = (x[:,1:] - x[:,:-1]) / dt   
+    x_ = (x[:, 1:] + x[:, :-1]) * 0.5
+    dx = (x[:, 1:] - x[:, :-1]) / dt
     x = x_
-    ddx = sys.compute_qddot(x,dx)
+    ddx = sys.compute_qddot(x, dx)
     B, T, _ = x.shape
-    t = torch.arange(T).unsqueeze(0).repeat(B,1).float() 
+    t = torch.arange(T).unsqueeze(0).repeat(B, 1).float()
 
-    dataset = TensorDataset(t, x, dx,ddx)
-    torch.save(dataset, './datasets/damped_dubpen_qddot.td')
+    dataset = TensorDataset(t, x, dx, ddx)
+    torch.save(dataset, "./datasets/damped_dubpen_qddot.td")
 
     if plot:
         for b in range(16):
 
-            plt.subplot(8,2,b+1)
+            plt.subplot(8, 2, b + 1)
             plt.plot(x[b])
 
         plt.show()
 
 
-
-
-
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

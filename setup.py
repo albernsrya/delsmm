@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import find_packages, setup
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
@@ -11,7 +11,7 @@ test_deps = [
     "pandas",
 ]
 extras = {
-    'test': test_deps,
+    "test": test_deps,
 }
 
 setup(
@@ -26,7 +26,7 @@ setup(
         "numpy",
         "scipy",
         "ceem>=0.0.2",
-        "pykalman>=0.9.5"
+        "pykalman>=0.9.5",
     ],
     tests_require=test_deps,
     extras_require=extras,

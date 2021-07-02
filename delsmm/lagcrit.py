@@ -2,14 +2,15 @@
 # lagcrit.py
 #
 
+import numpy as np
+import scipy.sparse as sp
 import torch
-from torch.autograd.functional import jacobian
 from ceem.opt_criteria import SOSCriterion
 from ceem.utils import temp_require_grad
-import scipy.sparse as sp
-import numpy as np
+from torch.autograd.functional import jacobian
 
 from .lagsys import BasicLagrangianSystem
+
 
 class DELCriterion(SOSCriterion):
     """
@@ -41,19 +42,27 @@ class DELCriterion(SOSCriterion):
             with torch.enable_grad():
                 t, q_, u = self.apply_inds(q, inds)
 
-                qtm1 = q_[:,:-2]
-                qt = q_[:,1:-1]
-                qtp1 = q_[:,2:]
+                qtm1 = q_[:, :-2]
+                qt = q_[:, 1:-1]
+                qtp1 = q_[:, 2:]
 
-                resid = self._sqrtlam * model.discrete_euler_lagrange(qtm1, qt, qtp1)
+                resid = self._sqrtlam * model.discrete_euler_lagrange(
+                    qtm1, qt, qtp1)
 
         return resid.view(-1) if flatten else resid
 
-    def jac_resid_x(self, model, q, sparse=False, sparse_format=sp.csr_matrix, inds=None):
+    def jac_resid_x(self,
+                    model,
+                    q,
+                    sparse=False,
+                    sparse_format=sp.csr_matrix,
+                    inds=None):
 
-        #q.requires_grad = True # make this safer
+        # q.requires_grad = True # make this safer
         with temp_require_grad([q]):
-            jac_dyn_q_ = jacobian(lambda q_: self.residuals(model, q_, inds=inds, flatten=True), q)
+            jac_dyn_q_ = jacobian(
+                lambda q_: self.residuals(model, q_, inds=inds, flatten=True),
+                q)
 
         if sparse:
             jac_dyn_q_ = jac_dyn_q_.reshape(jac_dyn_q_.shape[0], -1)

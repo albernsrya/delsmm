@@ -4,10 +4,11 @@
 
 import torch
 from ceem.opt_criteria import Criterion
-from delsmm.smm import AbstractStructuredMechanicalModel, AbstractLagrangianSystem
+
+from delsmm.smm import AbstractLagrangianSystem, AbstractStructuredMechanicalModel
+
 
 class MxNormBarrierCriterion(Criterion):
-
     def __init__(self, lb, mu=1.0, x_override=None):
         """
         Barrier specifying a minimum value for the expected matrix norm.
@@ -18,8 +19,8 @@ class MxNormBarrierCriterion(Criterion):
         """
         self._lb = lb
         self._mu = mu
-        self._x_override = x_override.detach() if x_override is not None else x_override
-
+        self._x_override = x_override.detach(
+        ) if x_override is not None else x_override
 
     def forward(self, model, x, **kwargs):
         """
@@ -32,7 +33,7 @@ class MxNormBarrierCriterion(Criterion):
         """
 
         assrcrit = isinstance(model, AbstractLagrangianSystem)
-        assert assrcrit, 'model must be an AbstractLagrangianSystem'
+        assert assrcrit, "model must be an AbstractLagrangianSystem"
 
         if self._x_override is not None:
             x = self._x_override
@@ -40,13 +41,12 @@ class MxNormBarrierCriterion(Criterion):
         if isinstance(model, AbstractStructuredMechanicalModel):
             mm = model._mass_matrix(x.detach())
         else:
-            x_ = 0.5 * (x[:,1:] + x[:,:-1])
-            dx_ = (1./model._dt) * (x[:,1:] - x[:,:-1])
+            x_ = 0.5 * (x[:, 1:] + x[:, :-1])
+            dx_ = (1.0 / model._dt) * (x[:, 1:] - x[:, :-1])
             mm = model.ke_hessian(x_.detach(), dx_.detach())
-        mmnorm = mm.norm(dim=(-2,-1)).mean()
+        mmnorm = mm.norm(dim=(-2, -1)).mean()
 
         return -self._mu * torch.log(mmnorm - self._lb)
-
 
     @staticmethod
     def mmxnorm(model, x):
@@ -59,21 +59,20 @@ class MxNormBarrierCriterion(Criterion):
             mmnorm (torch.tensor): scalar mean matrix norm
         """
         assrcrit = isinstance(model, AbstractLagrangianSystem)
-        assert assrcrit, 'model must be an AbstractLagrangianSystem'
-
+        assert assrcrit, "model must be an AbstractLagrangianSystem"
 
         if isinstance(model, AbstractStructuredMechanicalModel):
             mm = model._mass_matrix(x.detach())
         else:
-            x_ = 0.5 * (x[:,1:] + x[:,:-1])
-            dx_ = (1./model._dt) * (x[:,1:] - x[:,:-1])
+            x_ = 0.5 * (x[:, 1:] + x[:, :-1])
+            dx_ = (1.0 / model._dt) * (x[:, 1:] - x[:, :-1])
             mm = model.ke_hessian(x_.detach(), dx_.detach())
-        mmnorm = mm.norm(dim=(-2,-1)).mean()
+        mmnorm = mm.norm(dim=(-2, -1)).mean()
 
         return mmnorm
 
-class LogDetBarrierCriterion(Criterion):
 
+class LogDetBarrierCriterion(Criterion):
     def __init__(self, alpha, mu=1.0, x_override=None):
         """
         Barrier specifying a minimum value for the expected matrix norm.
@@ -84,8 +83,8 @@ class LogDetBarrierCriterion(Criterion):
         """
         self._alpha = alpha
         self._mu = mu
-        self._x_override = x_override.detach() if x_override is not None else x_override
-
+        self._x_override = x_override.detach(
+        ) if x_override is not None else x_override
 
     def forward(self, model, x, **kwargs):
         """
@@ -98,7 +97,7 @@ class LogDetBarrierCriterion(Criterion):
         """
 
         assrcrit = isinstance(model, AbstractLagrangianSystem)
-        assert assrcrit, 'model must be an AbstractLagrangianSystem'
+        assert assrcrit, "model must be an AbstractLagrangianSystem"
 
         if self._x_override is not None:
             x = self._x_override
@@ -106,15 +105,14 @@ class LogDetBarrierCriterion(Criterion):
         if isinstance(model, AbstractStructuredMechanicalModel):
             mm = model._mass_matrix(x.detach())
         else:
-            x_ = 0.5 * (x[:,1:] + x[:,:-1])
-            dx_ = (1./model._dt) * (x[:,1:] - x[:,:-1])
+            x_ = 0.5 * (x[:, 1:] + x[:, :-1])
+            dx_ = (1.0 / model._dt) * (x[:, 1:] - x[:, :-1])
             mm = model.ke_hessian(x_.detach(), dx_.detach())
-        
+
         n = x.shape[-1]
-        det = (mm - self._alpha * torch.eye(n).reshape(1,1,n,n)).det()
+        det = (mm - self._alpha * torch.eye(n).reshape(1, 1, n, n)).det()
 
         return -self._mu * torch.log(det).mean()
-
 
     @staticmethod
     def mineig(model, x):
@@ -127,16 +125,14 @@ class LogDetBarrierCriterion(Criterion):
             mmnorm (torch.tensor): scalar mean matrix norm
         """
         assrcrit = isinstance(model, AbstractLagrangianSystem)
-        assert assrcrit, 'model must be an AbstractLagrangianSystem'
-
+        assert assrcrit, "model must be an AbstractLagrangianSystem"
 
         if isinstance(model, AbstractStructuredMechanicalModel):
             mm = model._mass_matrix(x.detach())
         else:
-            x_ = 0.5 * (x[:,1:] + x[:,:-1])
-            dx_ = (1./model._dt) * (x[:,1:] - x[:,:-1])
+            x_ = 0.5 * (x[:, 1:] + x[:, :-1])
+            dx_ = (1.0 / model._dt) * (x[:, 1:] - x[:, :-1])
             mm = model.ke_hessian(x_.detach(), dx_.detach())
         mineig_ = mm.symeig()[0].min()
 
         return mineig_
-

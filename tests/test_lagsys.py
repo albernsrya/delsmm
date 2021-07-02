@@ -1,5 +1,7 @@
 import torch
+
 from delsmm.lagsys import BasicLagrangianSystem
+
 
 def test():
 
@@ -20,13 +22,11 @@ def test():
     # init sys
     sys = BasicLagrangianSystem(qdim=qdim, dt=0.1)
 
-    EL = sys.discrete_euler_lagrange(qtm1,qt,qtp1)
-    ELslow = sys.discrete_euler_lagrange_slow(qtm1,qt,qtp1)
+    EL = sys.discrete_euler_lagrange(qtm1, qt, qtp1)
+    ELslow = sys.discrete_euler_lagrange_slow(qtm1, qt, qtp1)
 
     assert torch.allclose(EL, ELslow)
 
 
-
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()
