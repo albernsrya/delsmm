@@ -1,16 +1,17 @@
 import torch
-from torch import nn
-from torch.autograd import grad
-from torch.autograd.functional import jacobian
-from scipy.optimize import root
 from ceem.dynamics import *
 from ceem.nn import LNMLP
 from ceem.utils import temp_require_grad
+from scipy.optimize import root
+from torch import nn
+from torch.autograd import grad
+from torch.autograd.functional import jacobian
 from tqdm import tqdm
 
-class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJacMixin):
 
-    def __init__(self, qdim, dt, method='midpoint'):
+class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin,
+                               DynJacMixin):
+    def __init__(self, qdim, dt, method="midpoint"):
         """
         Args:
             qdim (int): number of generalized coordinates
@@ -51,16 +52,17 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
         q = q.reshape(-1, self._qdim)
         qdot = qdot.reshape(-1, self._qdim)
 
-        
         with torch.enable_grad():
-            with temp_require_grad([q,qdot]):
+            with temp_require_grad([q, qdot]):
 
                 def lamfun(qdot_):
-                    KE = self.kinetic_energy(q, qdot_) # (*, 1)
-                    JKEq = grad(KE.sum(), [qdot_], create_graph=True)[0] # (*, qdim)
+                    KE = self.kinetic_energy(q, qdot_)  # (*, 1)
+                    JKEq = grad(KE.sum(), [qdot_],
+                                create_graph=True)[0]  # (*, qdim)
                     return JKEq.sum(0)
 
-                HKEqdqd = jacobian(lamfun, qdot, create_graph=create_graph).transpose(0,1)
+                HKEqdqd = jacobian(lamfun, qdot,
+                                   create_graph=create_graph).transpose(0, 1)
 
                 HKEqdqd = HKEqdqd.reshape(*Hdims)
 
@@ -85,8 +87,7 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
         Returns:
             F (torch.tensor): (*, qdim) generalized forces
         """
-        return 0. * q
-
+        return 0.0 * q
 
     def lagrangian(self, q, qdot):
         """
@@ -109,7 +110,7 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
             dlag (torch.tensor): (*, 1) discrete Lagrangian values
         """
 
-        q = 0.5*(qt+qtp1)
+        q = 0.5 * (qt + qtp1)
         qdot = (qtp1 - qt) / self._dt
         return self.lagrangian(q, qdot)
 
@@ -122,7 +123,7 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
         Returns:
             Fd (torch.tensor): (*, qdim) discrete generalized forces
         """
-        q = 0.5*(qt+qtp1)
+        q = 0.5 * (qt + qtp1)
         qdot = (qtp1 - qt) / self._dt
         return self.generalized_forces(q, qdot)
 
@@ -144,7 +145,7 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
         Fd1 = self.discrete_generalized_forces(qtm1, qt)
         Fd2 = self.discrete_generalized_forces(qt, qtp1)
 
-        Dlag = grad((lag1+lag2).sum(), [qt], create_graph=create_graph)[0]
+        Dlag = grad((lag1 + lag2).sum(), [qt], create_graph=create_graph)[0]
 
         avgFd = 0.5 * (Fd1 + Fd2)
 
@@ -202,23 +203,22 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
 
         if oneatatime:
 
-            q1 = q1.reshape(-1,self._qdim)
-            q2 = q2.reshape(-1,self._qdim)
+            q1 = q1.reshape(-1, self._qdim)
+            q2 = q2.reshape(-1, self._qdim)
 
             q3_ = torch.zeros_like(q1)
 
             for i in tqdm(range(q1.shape[0])):
-                q3_[i] = self.variational_step(q1[i:i+1], q2[i:i+1])
+                q3_[i] = self.variational_step(q1[i:i + 1], q2[i:i + 1])
 
             return q3_.reshape(*dims)
-
 
         def closure(q3):
             q3 = torch.tensor(q3).reshape(*dims)
 
             with temp_require_grad([q2]):
 
-                resid = self.discrete_euler_lagrange(q1,q2,q3)
+                resid = self.discrete_euler_lagrange(q1, q2, q3)
 
             return resid.reshape(-1).detach().numpy()
 
@@ -228,7 +228,8 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
 
             with temp_require_grad([q2, q3]):
 
-                tmpfun = lambda q_: self.discrete_euler_lagrange(q1,q2,q_).reshape(-1)
+                def tmpfun(q_):
+                    return self.discrete_euler_lagrange(q1, q2, q_).reshape(-1)
 
                 jac = jacobian(tmpfun, q3)
                 jac = jac.reshape(jac.shape[0], -1)
@@ -239,7 +240,7 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
 
         q3_guess = (q2 + dq).detach().numpy().reshape(-1)
 
-        res = root(closure, q3_guess, jac=jac, method='lm')
+        res = root(closure, q3_guess, jac=jac, method="lm")
 
         assert res.success, res
 
@@ -267,17 +268,26 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
         F = self.generalized_forces(q, qdot)
 
         with torch.enable_grad():
-            with temp_require_grad([q,qdot]):
+            with temp_require_grad([q, qdot]):
                 L = self.lagrangian(q, qdot)
-                Jq = grad(L.sum(),[q], create_graph=create_graph)[0].unsqueeze(-1)
-                Hqdqd = jacobian(lambda qd: grad(self.lagrangian(q, qd).sum(),[qd], create_graph=True)[0].sum(0), 
-                    qdot, create_graph=create_graph)
-                Hqdqd = Hqdqd.transpose(0,1)
-                Hqqd = jacobian(lambda q_: grad(self.lagrangian(q_, qdot).sum(),[qdot], create_graph=True)[0].sum(0), 
-                    q, create_graph=create_graph)
-                Hqqd = Hqqd.transpose(0,1)
+                Jq = grad(L.sum(), [q],
+                          create_graph=create_graph)[0].unsqueeze(-1)
+                Hqdqd = jacobian(
+                    lambda qd: grad(self.lagrangian(q, qd).sum(), [qd],
+                                    create_graph=True)[0].sum(0),
+                    qdot,
+                    create_graph=create_graph,
+                )
+                Hqdqd = Hqdqd.transpose(0, 1)
+                Hqqd = jacobian(
+                    lambda q_: grad(self.lagrangian(q_, qdot).sum(), [qdot],
+                                    create_graph=True)[0].sum(0),
+                    q,
+                    create_graph=create_graph,
+                )
+                Hqqd = Hqqd.transpose(0, 1)
 
-                b = (F.unsqueeze(-1) + Jq - Hqqd @ qdot.unsqueeze(-1))
+                b = F.unsqueeze(-1) + Jq - Hqqd @ qdot.unsqueeze(-1)
                 qddot = torch.solve(b, Hqdqd)[0].squeeze(-1)
 
         return qddot.reshape(dims)
@@ -294,22 +304,25 @@ class AbstractLagrangianSystem(C2DSystem, nn.Module, AnalyticObsJacMixin, DynJac
             xdot (torch.tensor): (B, T, qdim*2) [qdot, qddot]
         """
 
-        q = x[...,:self._qdim]
-        qdot = x[...,self._qdim:]
+        q = x[..., :self._qdim]
+        qdot = x[..., self._qdim:]
 
-        qddot = self.compute_qddot(q,qdot, create_graph=create_graph)
+        qddot = self.compute_qddot(q, qdot, create_graph=create_graph)
 
-        return torch.cat([qdot,qddot],dim=-1)
-
-
-
-
-
+        return torch.cat([qdot, qddot], dim=-1)
 
 
 class BasicLagrangianSystem(AbstractLagrangianSystem, nn.Module):
-
-    def __init__(self, qdim, dt, netparams={'hidden_sizes':[32]*3, 'activation':'tanh'}, method='midpoint'):
+    def __init__(
+        self,
+        qdim,
+        dt,
+        netparams={
+            "hidden_sizes": [32] * 3,
+            "activation": "tanh"
+        },
+        method="midpoint",
+    ):
         """
         Args:
             qdim (int): number of generalized coordinates
@@ -325,9 +338,8 @@ class BasicLagrangianSystem(AbstractLagrangianSystem, nn.Module):
         self._udim = None
         self._ydim = qdim
 
-        self._KEnet = LNMLP(input_size=qdim*2, output_size=1, **netparams)
+        self._KEnet = LNMLP(input_size=qdim * 2, output_size=1, **netparams)
         self._PEnet = LNMLP(input_size=qdim, output_size=1, **netparams)
-
 
     def kinetic_energy(self, q, qdot):
         """
@@ -338,9 +350,8 @@ class BasicLagrangianSystem(AbstractLagrangianSystem, nn.Module):
         Returns:
             KE (torch.tensor): (*, 1) kinetic energy values
         """
-        inp = torch.cat([q,qdot], dim=-1)
+        inp = torch.cat([q, qdot], dim=-1)
         return self._KEnet(inp)
-
 
     def potential_energy(self, q):
         """
@@ -351,5 +362,3 @@ class BasicLagrangianSystem(AbstractLagrangianSystem, nn.Module):
             PE (torch.tensor): (*, 1) potential energy values
         """
         return self._PEnet(q)
-
-

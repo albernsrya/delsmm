@@ -2,13 +2,14 @@
 # lag_doublepen.py
 #
 
-from ..lagsys import AbstractLagrangianSystem
 import torch
 from torch import nn
 
-class LagrangianDoublePendulum(AbstractLagrangianSystem, nn.Module):
+from ..lagsys import AbstractLagrangianSystem
 
-    def __init__(self, dt, m1, m2, l1, l2, g, eta = None, method='midpoint'):
+
+class LagrangianDoublePendulum(AbstractLagrangianSystem, nn.Module):
+    def __init__(self, dt, m1, m2, l1, l2, g, eta=None, method="midpoint"):
         """
         Double Pendulum
         Args:
@@ -36,17 +37,18 @@ class LagrangianDoublePendulum(AbstractLagrangianSystem, nn.Module):
 
     def lagrangian(self, q, qdot):
 
-        t1 = q[...,0:1]
-        t2 = q[...,1:2]
-        w1 = qdot[...,0:1]
-        w2 = qdot[...,1:2]
+        t1 = q[..., 0:1]
+        t2 = q[..., 1:2]
+        w1 = qdot[..., 0:1]
+        w2 = qdot[..., 1:2]
 
-        m1,m2,l1,l2,g = self._params
+        m1, m2, l1, l2, g = self._params
 
         # kinetic energy (T)
         T1 = 0.5 * m1 * (l1 * w1)**2
-        T2 = 0.5 * m2 * ((l1 * w1)**2 + (l2 * w2)**2 + \
-                        2 * l1 * l2 * w1 * w2 * torch.cos(t1 - t2))
+        T2 = (0.5 * m2 *
+              ((l1 * w1)**2 +
+               (l2 * w2)**2 + 2 * l1 * l2 * w1 * w2 * torch.cos(t1 - t2)))
         T = T1 + T2
 
         # potential energy (V)
@@ -66,7 +68,6 @@ class LagrangianDoublePendulum(AbstractLagrangianSystem, nn.Module):
             F (torch.tensor): (*, qdim) generalized forces
         """
         if self._eta is None:
-            return 0. * q
+            return 0.0 * q
         else:
             return -self._eta * qdot
-
